@@ -1,0 +1,8 @@
+.news-link {
+  color: #0073e6;
+  text-decoration: none;
+  font-size: 18px;
+}
+.news-link:visited {
+  color: purple;
+}
