@@ -94,38 +94,71 @@ def fetch_cnbc_latest_news():
     return articles
 
 # CNN
-def fetch_cnn_latest_news_selenium():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=options)
+# def fetch_cnn_latest_news_selenium():
+#     options = Options()
+#     options.add_argument("--headless")
+#     options.add_argument("--disable-gpu")
+#     options.add_argument("--no-sandbox")
+#     options.add_argument("--disable-dev-shm-usage")
+#     driver = webdriver.Chrome(options=options)
+#     url = "https://edition.cnn.com/world"
+#     driver.get(url)
+#     articles = []
+#     try:
+#         WebDriverWait(driver, 10).until(
+#             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
+#         )
+#         headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
+#         now = datetime.now(timezone.utc).isoformat()
+#         for a in headline_links[:30]:
+#             title = a.get_attribute("data-zjs-card_name") or a.text
+#             link = a.get_attribute("href")
+#             if link.startswith("/"):
+#                 link = "https://edition.cnn.com" + link
+#             articles.append({
+#                 "title": title.strip(),
+#                 "link": link,
+#                 "publishedAt": now
+#             })
+#     except Exception as e:
+#         print("CNN error:", e)
+#     finally:
+#         driver.quit()
+#     return articles
+def fetch_cnn_latest_news():
     url = "https://edition.cnn.com/world"
-    driver.get(url)
-    articles = []
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
-        )
-        headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
-        now = datetime.now(timezone.utc).isoformat()
-        for a in headline_links[:30]:
-            title = a.get_attribute("data-zjs-card_name") or a.text
-            link = a.get_attribute("href")
-            if link.startswith("/"):
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return []
+        soup = BeautifulSoup(response.text, 'html.parser')
+        articles = []
+
+        # CNN có cấu trúc khác nhau, ta lấy các thẻ <h3> hoặc <span> chứa link tin chính
+        # thử tìm tất cả thẻ a trong section có class "container__headline"
+        # hoặc lấy tất cả các a có href bắt đầu bằng "/2025" (các bài mới)
+
+        for a in soup.select('h3 a, span a'):
+            link = a.get('href')
+            title = a.get_text(strip=True)
+            if not link or not title:
+                continue
+            if not link.startswith('http'):
                 link = "https://edition.cnn.com" + link
             articles.append({
-                "title": title.strip(),
-                "link": link,
-                "publishedAt": now
+                'title': title,
+                'link': link,
+                'publishedAt': datetime.now(timezone.utc).isoformat()
             })
-    except Exception as e:
-        print("CNN error:", e)
-    finally:
-        driver.quit()
-    return articles
 
+            if len(articles) >= 30:
+                break
+
+        return articles
+    except Exception as e:
+        print("Error fetching CNN news:", e)
+        return []
 # Fox Business
 def fetch_foxbusiness_latest_news():
     url = "https://www.foxbusiness.com/"
@@ -227,7 +260,8 @@ def auto_update_news():
     while True:
         print("⏳ Đang crawl lại tin mới...")
         try:
-            news_cache["cnn"] = fetch_cnn_latest_news_selenium()
+            # news_cache["cnn"] = fetch_cnn_latest_news_selenium()
+            news_cache["cnn"] = fetch_cnn_latest_news()
             news_cache["cnbc"] = fetch_cnbc_latest_news()
             news_cache["fox"] = fetch_foxbusiness_latest_news()
             news_cache["yahoo"] = fetch_yahoo_finance_latest_news()
