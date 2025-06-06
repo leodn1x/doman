@@ -12,18 +12,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pymongo import MongoClient
-from flask import Flask, send_from_directory
-import os
 
-app = Flask(__name__, static_folder='build', static_url_path='/')
+app = Flask(__name__)
 CORS(app)
-@app.route('/')
-def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
 
-@app.errorhandler(404)
-def not_found(e):
-    return send_from_directory(app.static_folder, 'index.html')
 # MongoDB setup
 try:
     client = MongoClient("mongodb+srv://leodoan08:Bikute3399@cluster0.fnbw3uc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
@@ -94,71 +86,38 @@ def fetch_cnbc_latest_news():
     return articles
 
 # CNN
-# def fetch_cnn_latest_news_selenium():
-#     options = Options()
-#     options.add_argument("--headless")
-#     options.add_argument("--disable-gpu")
-#     options.add_argument("--no-sandbox")
-#     options.add_argument("--disable-dev-shm-usage")
-#     driver = webdriver.Chrome(options=options)
-#     url = "https://edition.cnn.com/world"
-#     driver.get(url)
-#     articles = []
-#     try:
-#         WebDriverWait(driver, 10).until(
-#             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
-#         )
-#         headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
-#         now = datetime.now(timezone.utc).isoformat()
-#         for a in headline_links[:30]:
-#             title = a.get_attribute("data-zjs-card_name") or a.text
-#             link = a.get_attribute("href")
-#             if link.startswith("/"):
-#                 link = "https://edition.cnn.com" + link
-#             articles.append({
-#                 "title": title.strip(),
-#                 "link": link,
-#                 "publishedAt": now
-#             })
-#     except Exception as e:
-#         print("CNN error:", e)
-#     finally:
-#         driver.quit()
-#     return articles
-def fetch_cnn_latest_news():
+def fetch_cnn_latest_news_selenium():
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=options)
     url = "https://edition.cnn.com/world"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    driver.get(url)
+    articles = []
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            return []
-        soup = BeautifulSoup(response.text, 'html.parser')
-        articles = []
-
-        # CNN có cấu trúc khác nhau, ta lấy các thẻ <h3> hoặc <span> chứa link tin chính
-        # thử tìm tất cả thẻ a trong section có class "container__headline"
-        # hoặc lấy tất cả các a có href bắt đầu bằng "/2025" (các bài mới)
-
-        for a in soup.select('h3 a, span a'):
-            link = a.get('href')
-            title = a.get_text(strip=True)
-            if not link or not title:
-                continue
-            if not link.startswith('http'):
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
+        )
+        headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
+        now = datetime.now(timezone.utc).isoformat()
+        for a in headline_links[:30]:
+            title = a.get_attribute("data-zjs-card_name") or a.text
+            link = a.get_attribute("href")
+            if link.startswith("/"):
                 link = "https://edition.cnn.com" + link
             articles.append({
-                'title': title,
-                'link': link,
-                'publishedAt': datetime.now(timezone.utc).isoformat()
+                "title": title.strip(),
+                "link": link,
+                "publishedAt": now
             })
-
-            if len(articles) >= 30:
-                break
-
-        return articles
     except Exception as e:
-        print("Error fetching CNN news:", e)
-        return []
+        print("CNN error:", e)
+    finally:
+        driver.quit()
+    return articles
+
 # Fox Business
 def fetch_foxbusiness_latest_news():
     url = "https://www.foxbusiness.com/"
@@ -260,8 +219,7 @@ def auto_update_news():
     while True:
         print("⏳ Đang crawl lại tin mới...")
         try:
-            # news_cache["cnn"] = fetch_cnn_latest_news_selenium()
-            news_cache["cnn"] = fetch_cnn_latest_news()
+            news_cache["cnn"] = fetch_cnn_latest_news_selenium()
             news_cache["cnbc"] = fetch_cnbc_latest_news()
             news_cache["fox"] = fetch_foxbusiness_latest_news()
             news_cache["yahoo"] = fetch_yahoo_finance_latest_news()
@@ -300,5 +258,4 @@ def api_fox(): return jsonify({"count": len(news_cache["fox"]), "news": news_cac
 # Khởi chạy
 if __name__ == "__main__":
     threading.Thread(target=auto_update_news, daemon=True).start()
-    port = int(os.environ.get("PORT", 5000))  # Lấy PORT từ env, nếu không có thì mặc định 5000
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False)
