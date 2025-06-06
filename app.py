@@ -18,8 +18,10 @@ CORS(app)
 
 # MongoDB setup
 mongo_uri = os.getenv("MONGODB_URI")
+print("MONGODB_URI =", os.getenv("MONGODB_URI"))
+
 try:
-    client = MongoClient(mongo_uri, tls=True)
+    client = MongoClient(mongo_uri)
     db = client["news_db"]
     print("✅ Kết nối MongoDB thành công!")
     print("📦 Các collection:", db.list_collection_names())
