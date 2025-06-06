@@ -22,7 +22,7 @@ function NewsList({ title, apiUrl }) {
     }
 
     fetchNews();
-    const interval = setInterval(fetchNews, 30000); // reload mỗi 60s
+    const interval = setInterval(fetchNews, 30000); // fetch lại dữ liệu mỗi 30s
     return () => clearInterval(interval);
   }, [apiUrl]);
 
@@ -52,6 +52,13 @@ function NewsList({ title, apiUrl }) {
 }
 
 function App() {
+  useEffect(() => {
+    const reloadInterval = setInterval(() => {
+      window.location.reload();
+    }, 30000); // reload toàn bộ trang mỗi 30 giây
+    return () => clearInterval(reloadInterval);
+  }, []);
+
   const boxStyle = {
     flex: 1,
     margin: 10,
@@ -62,31 +69,32 @@ function App() {
     resize: "vertical"
   };
 
+  const API_BASE = "http://localhost:5000/api/news-from-db";
+
   return (
     <div style={{ fontFamily: "Arial", padding: 20 }}>
       {/* Row 1 */}
       <div style={{ display: "flex" }}>
         <div style={boxStyle}>
-          <NewsList title="CNN" apiUrl="http://localhost:5000/api/cnn-news" />
+          <NewsList title="CNN" apiUrl={`${API_BASE}/cnn-news`} />
         </div>
         <div style={boxStyle}>
-          <NewsList title="CNBC" apiUrl="http://localhost:5000/api/news" />
+        <NewsList title="CNBC" apiUrl={`${API_BASE}/cnbc-news`} />
         </div>
         <div style={boxStyle}>
-          <NewsList title="Foxbusiness" apiUrl="http://localhost:5000/api/foxbusiness-news" />
+          <NewsList title="Fox Business" apiUrl={`${API_BASE}/foxbusiness-news`} />
         </div>
       </div>
 
       {/* Row 2 */}
       <div style={{ display: "flex" }}>
         <div style={boxStyle}>
-          <NewsList title="CBS News" apiUrl="http://localhost:5000/api/cbs-news" />
+          <NewsList title="CBS News" apiUrl={`${API_BASE}/cbs-news`} />
         </div>
         <div style={boxStyle}>
-          <NewsList title="Yahoo News" apiUrl="http://localhost:5000/api/yahoo-news" />
+          <NewsList title="Yahoo News" apiUrl={`${API_BASE}/yahoo-news`} />
         </div>
       </div>
-      
     </div>
   );
 }

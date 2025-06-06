@@ -11,11 +11,21 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from pymongo import MongoClient
 
 app = Flask(__name__)
 CORS(app)
 
-# Biến lưu cache RAM (luôn cập nhật mỗi phút)
+# MongoDB setup
+try:
+    client = MongoClient("mongodb+srv://leodoan08:Bikute3399@cluster0.fnbw3uc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    db = client["news_db"]
+    print("✅ Kết nối MongoDB thành công!")
+    print("📦 Các collection:", db.list_collection_names())
+except Exception as e:
+    print("❌ Kết nối thất bại:", e)
+
+# Dùng RAM cache để hiển thị nhanh
 news_cache = {
     "cnn": [],
     "cnbc": [],
@@ -24,7 +34,20 @@ news_cache = {
     "cbsnews": [],
 }
 
-# ----------- Crawl Time Helper ----------
+# Hàm chọn collection tương ứng
+def get_collection_by_source(source):
+    valid_sources = {
+        "cnn-news": "cnn-news",
+        "cnbc-news": "cnbc-news",
+        "foxbusiness-news": "fox-news",
+        "yahoo-news": "yahoo-news",
+        "cbs-news": "cbsnews-news"
+    }
+    if source not in valid_sources:
+        return None
+    return db[valid_sources[source]]
+
+# Lấy thời gian từ bài báo
 def get_article_time(article_url):
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
@@ -40,14 +63,13 @@ def get_article_time(article_url):
         return None
     return None
 
-# ---------- CNBC ----------
+# CNBC
 def fetch_cnbc_latest_news():
     url = "https://www.cnbc.com/world/"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
         return []
-
     soup = BeautifulSoup(response.text, 'html.parser')
     articles = []
     for item in soup.select('a.LatestNews-headline'):
@@ -63,18 +85,16 @@ def fetch_cnbc_latest_news():
         })
     return articles
 
-# ---------- CNN ----------
+# CNN
 def fetch_cnn_latest_news_selenium():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
     driver = webdriver.Chrome(options=options)
     url = "https://edition.cnn.com/world"
     driver.get(url)
-
     articles = []
     try:
         WebDriverWait(driver, 10).until(
@@ -98,14 +118,13 @@ def fetch_cnn_latest_news_selenium():
         driver.quit()
     return articles
 
-# ---------- FOX ----------
+# Fox Business
 def fetch_foxbusiness_latest_news():
     url = "https://www.foxbusiness.com/"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
         return []
-
     soup = BeautifulSoup(response.text, 'html.parser')
     articles = []
     for item in soup.select('h2 a[href]'):
@@ -113,11 +132,8 @@ def fetch_foxbusiness_latest_news():
         link = item['href']
         if not link.startswith('http'):
             link = 'https://www.foxbusiness.com' + link
-
-        # Lọc bỏ các link chuyên mục, danh mục
         if "/category/" in link or "/tags/" in link:
             continue
-
         publishedAt = get_article_time(link) or datetime.now(timezone.utc)
         articles.append({
             'title': title,
@@ -126,16 +142,15 @@ def fetch_foxbusiness_latest_news():
         })
     return articles
 
+# CBS
 def get_cbs_news():
     try:
         url = "https://www.cbsnews.com/latest/"
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
-
         soup = BeautifulSoup(response.text, 'html.parser')
         articles = []
-
         for item in soup.select('article.item a'):
             title = item.get_text(strip=True)
             link = item.get('href')
@@ -144,31 +159,24 @@ def get_cbs_news():
             if title and link:
                 articles.append({
                     'title': title,
-                    'link': link
+                    'link': link,
+                    'publishedAt': datetime.now(timezone.utc).isoformat()
                 })
-
-        # Trả về danh sách 15 bài mới nhất
         return articles[:15]
     except Exception as e:
-        print("Error fetching CBS News:", e)
+        print("CBS error:", e)
         return []
 
-
+# Yahoo
 def fetch_yahoo_finance_latest_news():
     url = 'https://finance.yahoo.com/'
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0'}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
         return []
-
     soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Cố gắng tìm khối Latest News (có thể thay đổi, bạn có thể debug lại nếu không lấy được)
     latest_section = soup.find('div', class_='hero-headlines hero-latest-news yf-36pijq')
     articles = []
-
     if latest_section:
         items = latest_section.find_all('li', class_='story-item')
         for item in items:
@@ -179,23 +187,34 @@ def fetch_yahoo_finance_latest_news():
                 link = link_tag['href']
                 if link.startswith('/'):
                     link = 'https://finance.yahoo.com' + link
-
                 publishedAt = get_article_time(link) or datetime.now(timezone.utc)
                 articles.append({
                     'title': title,
                     'link': link,
                     'publishedAt': publishedAt.isoformat()
                 })
-    else:
-        # Nếu không tìm thấy block, có thể fallback hoặc trả về rỗng
-        print("Không tìm thấy khối 'Latest News' trên Yahoo Finance.")
-    
     return articles
 
+# API đọc từ MongoDB
+@app.route("/api/news-from-db/<source>")
+def api_news_from_db(source):
+    collection = get_collection_by_source(source)
+    if collection is None:
+        return jsonify({"error": "Invalid source"}), 400
+    try:
+        cursor = collection.find().sort("publishedAt", -1).limit(50)
+        articles = []
+        for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            articles.append(doc)
+        return jsonify({
+            "count": len(articles),
+            "news": articles
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-
-
-# ----------- Update thread mỗi phút -----------
+# Cập nhật dữ liệu mỗi phút và lưu vào MongoDB
 def auto_update_news():
     while True:
         print("⏳ Đang crawl lại tin mới...")
@@ -206,48 +225,37 @@ def auto_update_news():
             news_cache["yahoo"] = fetch_yahoo_finance_latest_news()
             news_cache["cbsnews"] = get_cbs_news()
 
+            for source, articles in news_cache.items():
+                collection = db[source + "-news"]
+                for article in articles:
+                    collection.update_one(
+                        {"link": article["link"]},
+                        {"$set": {**article, "source": source}},
+                        upsert=True
+                    )
+
             print("✅ Tin đã được cập nhật lúc", datetime.now().strftime('%H:%M:%S'))
         except Exception as e:
             print("❌ Lỗi khi cập nhật:", e)
         time.sleep(60)
 
-# ----------- API Route trả về cache RAM ----------
-
-@app.route('/api/cbs-news')
-def api_cbsnews():
-    return jsonify({
-        "count": len(news_cache["cbsnews"]),
-        "news": news_cache["cbsnews"]
-    })
+# API RAM cache (tùy chọn)
+@app.route("/api/cbs-news")
+def api_cbsnews(): return jsonify({"count": len(news_cache["cbsnews"]), "news": news_cache["cbsnews"]})
 
 @app.route("/api/yahoo-news")
-def api_yahoo():
-    return jsonify({
-        "count": len(news_cache["yahoo"]),
-        "news": news_cache["yahoo"]
-    })
+def api_yahoo(): return jsonify({"count": len(news_cache["yahoo"]), "news": news_cache["yahoo"]})
+
 @app.route("/api/cnn-news")
-def api_cnn():
-    return jsonify({
-        "count": len(news_cache["cnn"]),
-        "news": news_cache["cnn"]
-    })
+def api_cnn(): return jsonify({"count": len(news_cache["cnn"]), "news": news_cache["cnn"]})
 
 @app.route("/api/news")
-def api_cnbc():
-    return jsonify({
-        "count": len(news_cache["cnbc"]),
-        "news": news_cache["cnbc"]
-    })
+def api_cnbc(): return jsonify({"count": len(news_cache["cnbc"]), "news": news_cache["cnbc"]})
 
 @app.route("/api/foxbusiness-news")
-def api_fox():
-    return jsonify({
-        "count": len(news_cache["fox"]),
-        "news": news_cache["fox"]
-    })
+def api_fox(): return jsonify({"count": len(news_cache["fox"]), "news": news_cache["fox"]})
 
-# ----------- Chạy Flask và khởi động thread update ----------
+# Khởi chạy
 if __name__ == "__main__":
     threading.Thread(target=auto_update_news, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=False)
