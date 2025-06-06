@@ -13,6 +13,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pymongo import MongoClient
 from flask import Flask, send_from_directory
+import os
 
 app = Flask(__name__, static_folder='build', static_url_path='/')
 CORS(app)
@@ -265,4 +266,5 @@ def api_fox(): return jsonify({"count": len(news_cache["fox"]), "news": news_cac
 # Khởi chạy
 if __name__ == "__main__":
     threading.Thread(target=auto_update_news, daemon=True).start()
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))  # Lấy PORT từ env, nếu không có thì mặc định 5000
+    app.run(host="0.0.0.0", port=port, debug=False)
