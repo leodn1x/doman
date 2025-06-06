@@ -12,7 +12,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pymongo import MongoClient
-
+import os
+import tempfile
 app = Flask(__name__)
 CORS(app)
 
@@ -22,7 +23,7 @@ try:
     client = MongoClient(
         mongo_uri,
         tls=True,
-        tlsAllowInvalidCertificates=False
+        tlsAllowInvalidCertificates=True  # ⚠️ Chỉ dùng cái này khi cần bỏ qua chứng chỉ tự ký
     )
     db = client["news_db"]
     print("✅ Kết nối MongoDB thành công!")
@@ -91,36 +92,72 @@ def fetch_cnbc_latest_news():
     return articles
 
 # CNN
+# def fetch_cnn_latest_news_selenium():
+#     options = Options()
+#     temp_profile_dir = tempfile.mkdtemp()
+#     options.add_argument(f'--user-data-dir={temp_profile_dir}')
+#     options.add_argument("--headless")
+#     options.add_argument("--disable-gpu")
+#     options.add_argument("--no-sandbox")
+#     options.add_argument("--disable-dev-shm-usage")
+#     driver = webdriver.Chrome(options=options)
+#     url = "https://edition.cnn.com/world"
+#     driver.get(url)
+#     articles = []
+#     try:
+#         WebDriverWait(driver, 10).until(
+#             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
+#         )
+#         headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
+#         now = datetime.now(timezone.utc).isoformat()
+#         for a in headline_links[:30]:
+#             title = a.get_attribute("data-zjs-card_name") or a.text
+#             link = a.get_attribute("href")
+#             if link.startswith("/"):
+#                 link = "https://edition.cnn.com" + link
+#             articles.append({
+#                 "title": title.strip(),
+#                 "link": link,
+#                 "publishedAt": now
+#             })
+#     except Exception as e:
+#         print("CNN error:", e)
+#     finally:
+#         driver.quit()
+#     return articles
 def fetch_cnn_latest_news_selenium():
     options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=options)
-    url = "https://edition.cnn.com/world"
-    driver.get(url)
-    articles = []
-    try:
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
-        )
-        headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
-        now = datetime.now(timezone.utc).isoformat()
-        for a in headline_links[:30]:
-            title = a.get_attribute("data-zjs-card_name") or a.text
-            link = a.get_attribute("href")
-            if link.startswith("/"):
-                link = "https://edition.cnn.com" + link
-            articles.append({
-                "title": title.strip(),
-                "link": link,
-                "publishedAt": now
-            })
-    except Exception as e:
-        print("CNN error:", e)
-    finally:
-        driver.quit()
+    with tempfile.TemporaryDirectory() as temp_profile_dir:
+        options.add_argument(f'--user-data-dir={temp_profile_dir}')
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        driver = webdriver.Chrome(options=options)
+
+        url = "https://edition.cnn.com/world"
+        driver.get(url)
+        articles = []
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.container__link--type-article"))
+            )
+            headline_links = driver.find_elements(By.CSS_SELECTOR, "a.container__link--type-article")
+            now = datetime.now(timezone.utc).isoformat()
+            for a in headline_links[:30]:
+                title = a.get_attribute("data-zjs-card_name") or a.text
+                link = a.get_attribute("href")
+                if link.startswith("/"):
+                    link = "https://edition.cnn.com" + link
+                articles.append({
+                    "title": title.strip(),
+                    "link": link,
+                    "publishedAt": now
+                })
+        except Exception as e:
+            print("CNN error:", e)
+        finally:
+            driver.quit()
     return articles
 
 # Fox Business
