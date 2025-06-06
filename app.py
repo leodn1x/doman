@@ -18,7 +18,11 @@ CORS(app)
 
 # MongoDB setup
 try:
-    client = MongoClient("mongodb+srv://leodoan08:Bikute3399@cluster0.fnbw3uc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    client = MongoClient(
+        "mongodb+srv://leodoan08:Bikute3399@cluster0.fnbw3uc.mongodb.net/?retryWrites=true&w=majority",
+        tls=True,
+        tlsAllowInvalidCertificates=False
+    )
     db = client["news_db"]
     print("✅ Kết nối MongoDB thành công!")
     print("📦 Các collection:", db.list_collection_names())
