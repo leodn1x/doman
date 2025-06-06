@@ -12,10 +12,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pymongo import MongoClient
+from flask import Flask, send_from_directory
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='build', static_url_path='/')
 CORS(app)
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
 
+@app.errorhandler(404)
+def not_found(e):
+    return send_from_directory(app.static_folder, 'index.html')
 # MongoDB setup
 try:
     client = MongoClient("mongodb+srv://leodoan08:Bikute3399@cluster0.fnbw3uc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
