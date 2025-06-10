@@ -12,22 +12,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pymongo import MongoClient
-import os
+from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 CORS(app)
 
 # MongoDB setup
-mongo_uri = os.getenv("MONGODB_URI")
-print("MONGODB_URI =", os.getenv("MONGODB_URI"))
-
 try:
-    client = MongoClient(mongo_uri)
+    client = MongoClient("mongodb+srv://leodoan08:Bikute3399@cluster0.fnbw3uc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
     db = client["news_db"]
     print("✅ Kết nối MongoDB thành công!")
     print("📦 Các collection:", db.list_collection_names())
 except Exception as e:
     print("❌ Kết nối thất bại:", e)
+
 # Dùng RAM cache để hiển thị nhanh
 news_cache = {
     "cnn": [],
@@ -257,6 +255,46 @@ def api_cnbc(): return jsonify({"count": len(news_cache["cnbc"]), "news": news_c
 
 @app.route("/api/foxbusiness-news")
 def api_fox(): return jsonify({"count": len(news_cache["fox"]), "news": news_cache["fox"]})
+
+
+@app.route("/api/elon-tweets")
+def get_elon_tweets():
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto("https://x.com/elonmusk")
+            page.wait_for_selector("article")
+
+            tweets = page.eval_on_selector_all(
+                "article div[lang]",
+                "nodes => nodes.slice(0, 5).map(n => n.innerText)"
+            )
+
+            browser.close()
+            return jsonify({"tweets": tweets})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
+@app.route("/api/trump-tweets")
+def TrumpDailyPosts():
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto("https://x.com/TrumpDailyPosts")
+            page.wait_for_selector("article")
+
+            tweets = page.eval_on_selector_all(
+                "article div[lang]",
+                "nodes => nodes.slice(0, 5).map(n => n.innerText)"
+            )
+
+            browser.close()
+            return jsonify({"tweets": tweets})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # Khởi chạy
 if __name__ == "__main__":

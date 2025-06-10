@@ -69,7 +69,7 @@ function App() {
     resize: "vertical"
   };
 
-  const API_BASE = "http://localhost:5000/api/news-from-db";
+  const API_BASE = "http://localhost:5000/api";
 
   return (
     <div style={{ fontFamily: "Arial", padding: 20 }}>
@@ -79,7 +79,7 @@ function App() {
           <NewsList title="CNN" apiUrl={`${API_BASE}/cnn-news`} />
         </div>
         <div style={boxStyle}>
-        <NewsList title="CNBC" apiUrl={`${API_BASE}/cnbc-news`} />
+        <NewsList title="CNBC" apiUrl={`${API_BASE}/news`} />
         </div>
         <div style={boxStyle}>
           <NewsList title="Fox Business" apiUrl={`${API_BASE}/foxbusiness-news`} />
